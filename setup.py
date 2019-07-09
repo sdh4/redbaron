@@ -4,15 +4,15 @@
 from setuptools import setup
 
 try:
-    from pypandoc import convert
-    read_md = lambda f: convert(f, 'rst')
+    from pypandoc import convert_file
+    read_md = lambda f: convert_file(f, 'rst')
 except ImportError:
     print("warning: pypandoc module not found, could not convert Markdown to RST")
     read_md = lambda f: open(f, 'r').read()
 
 
 setup(name='redbaron',
-      version='0.7.1',
+      version='0.9.2',
       description='Abstraction on top of baron, a FST for python to make writing refactoring code a realistic task',
       author='Laurent Peuch',
       long_description=read_md("README.md") + "\n\n" + open("CHANGELOG", "r").read(),

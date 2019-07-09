@@ -223,6 +223,7 @@ def d():
     pass
 """
 
+
 def test_set_attr_def_advanced_dont_break_next_block_indent():
     red = RedBaron(code_for_block_setattr)
     red.find("def", name="c").value = "return 42"
@@ -325,6 +326,24 @@ def test_set_attr_def_unset_async_indent():
     red = RedBaron("class A:\n    async def a(): pass")
     red.def_.async_ = False
     assert red.dumps() == "class A:\n    def a(): pass\n"
+
+
+def test_set_attr_def_set_return_annotation():
+    red = RedBaron("def a(): pass")
+    red[0].return_annotation = "Int"
+    assert red.dumps() == "def a() -> Int: pass\n"
+
+
+def test_set_attr_def_set_return_annotation_keep_formatting():
+    red = RedBaron("def a() ->    Int: pass")
+    red[0].return_annotation = "pouet"
+    assert red.dumps() == "def a() ->    pouet: pass\n"
+
+
+def test_set_attr_def_unset_return_annotation():
+    red = RedBaron("def a() -> Int: pass")
+    red[0].return_annotation = ""
+    assert red.dumps() == "def a(): pass\n"
 
 
 def test_set_decorator_def():
@@ -500,6 +519,36 @@ def test_assign_node_setattr_operator():
         red[0].operator = "raise"
 
 
+def test_assign_node_setattr_annotation():
+    red = RedBaron("a = b")
+    red[0].annotation = "Int"
+    assert red.dumps() == "a : Int = b"
+
+
+def test_assign_node_setattr_annotation_existing():
+    red = RedBaron("a : Str = b")
+    red[0].annotation = "Int"
+    assert red.dumps() == "a : Int = b"
+
+
+def test_assign_node_setattr_remove():
+    red = RedBaron("a : Int = b")
+    red[0].annotation = ""
+    assert red.dumps() == "a = b"
+
+
+def test_standalone_annotation():
+    red = RedBaron("a : Int")
+    red[0].annotation = "Str"
+    assert red.dumps() == "a : Str"
+
+
+def test_star_var():
+    red = RedBaron("a, *b = c")
+    red[0].target[1].value = "(x, y)"
+    assert red.dumps() == "a, *(x, y) = c"
+
+
 def test_await_setattr_value():
     red = RedBaron("await a")
     red[0].value = "b"
@@ -534,6 +583,40 @@ def test_for_setattr_iterator():
     assert red[0].iterator.type == "name"
     with pytest.raises(Exception):
         red[0].iterator = "raise"
+
+
+def test_set_attr_for_async_dont_break_initial_formatting():
+    red = RedBaron("async    for a in b: pass")
+    assert red.dumps() == "async    for a in b: pass\n"
+
+
+def test_set_attr_for_set_async():
+    red = RedBaron("for a in b: pass")
+    red[0].async_ = True
+    assert red.dumps() == "async for a in b: pass\n"
+
+
+def test_set_attr_for_unset_async():
+    red = RedBaron("async for a in b: pass")
+    red[0].async_ = False
+    assert red.dumps() == "for a in b: pass\n"
+
+
+def test_set_attr_for_async_dont_break_initial_formatting_indent():
+    red = RedBaron("class A:\n    async    for a in b: pass")
+    assert red.dumps() == "class A:\n    async    for a in b: pass\n"
+
+
+def test_set_attr_for_set_async_indent():
+    red = RedBaron("class A:\n    for a in b: pass")
+    red.for_.async_ = True
+    assert red.dumps() == "class A:\n    async for a in b: pass\n"
+
+
+def test_set_attr_for_unset_async_indent():
+    red = RedBaron("class A:\n    async for a in b: pass")
+    red.for_.async_ = False
+    assert red.dumps() == "class A:\n    for a in b: pass\n"
 
 
 def test_while_setattr_value():
@@ -579,6 +662,40 @@ def test_with_setattr_context():
     red = RedBaron("with a: pass")
     red[0].contexts = "a as b, b as c"
     assert red[0].dumps() == "with a as b, b as c: pass\n"
+
+
+def test_set_attr_with_async_dont_break_initial_withmatting():
+    red = RedBaron("async    with a as b: pass")
+    assert red.dumps() == "async    with a as b: pass\n"
+
+
+def test_set_attr_with_set_async():
+    red = RedBaron("with a as b: pass")
+    red[0].async_ = True
+    assert red.dumps() == "async with a as b: pass\n"
+
+
+def test_set_attr_with_unset_async():
+    red = RedBaron("async with a as b: pass")
+    red[0].async_ = False
+    assert red.dumps() == "with a as b: pass\n"
+
+
+def test_set_attr_with_async_dont_break_initial_withmatting_indent():
+    red = RedBaron("class A:\n    async    with a as b: pass")
+    assert red.dumps() == "class A:\n    async    with a as b: pass\n"
+
+
+def test_set_attr_with_set_async_indent():
+    red = RedBaron("class A:\n    with a as b: pass")
+    red.with_.async_ = True
+    assert red.dumps() == "class A:\n    async with a as b: pass\n"
+
+
+def test_set_attr_with_unset_async_indent():
+    red = RedBaron("class A:\n    async with a as b: pass")
+    red.with_.async_ = False
+    assert red.dumps() == "class A:\n    with a as b: pass\n"
 
 
 def test_with_context_item_value():
@@ -892,6 +1009,48 @@ def test_def_argument_setattr_value():
         red[0].arguments[0].value = "def a(): pass\n"
 
 
+def test_def_argument_setattr_annotation():
+    red = RedBaron("def a(b): pass")
+    red[0].arguments[0].annotation = "Int"
+    assert red.dumps() == "def a(b : Int): pass\n"
+
+
+def test_def_argument_setattr_annotation_value():
+    red = RedBaron("def a(b : Int): pass")
+    red[0].arguments[0].value = "plop"
+    assert red.dumps() == "def a(b : Int=plop): pass\n"
+
+
+def test_def_argument_setattr_remove_annotation():
+    red = RedBaron("def a(b : Int): pass")
+    red[0].arguments[0].annotation = ""
+    assert red.dumps() == "def a(b): pass\n"
+
+
+def test_list_argument_setattr_annotation():
+    red = RedBaron("def a(*b): pass")
+    red[0].arguments[0].annotation = "Int"
+    assert red.dumps() == "def a(*b : Int): pass\n"
+
+
+def test_list_argument_setattr_remove_annotation():
+    red = RedBaron("def a(*b : Int): pass")
+    red[0].arguments[0].annotation = ""
+    assert red.dumps() == "def a(*b): pass\n"
+
+
+def test_dict_argument_setattr_annotation():
+    red = RedBaron("def a(**b): pass")
+    red[0].arguments[0].annotation = "Int"
+    assert red.dumps() == "def a(**b : Int): pass\n"
+
+
+def test_dict_argument_setattr_remove_annotation():
+    red = RedBaron("def a(**b : Int): pass")
+    red[0].arguments[0].annotation = ""
+    assert red.dumps() == "def a(**b): pass\n"
+
+
 def test_del_setattr_value():
     red = RedBaron("del a")
     red[0].value = "a, b, c"
@@ -1185,6 +1344,40 @@ def test_raise_setattr_traceback_raise():
     red = RedBaron("raise a")
     with pytest.raises(Exception):
         red[0].traceback = "c"
+
+
+def test_raise_from_setattr_instance():
+    red = RedBaron("raise a from b")
+    red[0].instance = "hop"
+    assert red.dumps() == "raise a from hop"
+
+
+def test_raise_from_setattr_instance_remove():
+    red = RedBaron("raise a from b")
+    red[0].instance = ""
+    assert red.dumps() == "raise a"
+
+
+def test_raise_from_setattr_set_instance():
+    red = RedBaron("raise a")
+    red[0].instance = "b"
+    assert red.dumps() == "raise a, b"
+    red[0].comma_or_from = "from"
+    assert red.dumps() == "raise a from b"
+    red[0].comma_or_from = ","
+    assert red.dumps() == "raise a, b"
+
+
+def test_raise_from_setattr_set_comma():
+    red = RedBaron("raise a from b")
+    red[0].comma_or_from = ","
+    assert red.dumps() == "raise a, b"
+
+
+def test_raise_from_setattr_set_from():
+    red = RedBaron("raise a, b")
+    red[0].comma_or_from = "from"
+    assert red.dumps() == "raise a from b"
 
 
 def test_return_setattr_value():
@@ -1860,4 +2053,3 @@ def test_ifelseblock_setattr_indented_followed():
     red = RedBaron("def a():\n    if a:\n        pass\n\n\n    pouet\n")
     red[0].value.node_list[1].value = "if 1 + 1:\n    qsd\n"
     assert red.dumps() == "def a():\n    if 1 + 1:\n        qsd\n\n    pouet\n"
-
