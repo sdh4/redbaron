@@ -63,6 +63,21 @@ class AssignmentNode(Node):
         elif on_attribute == "value":
             return Node.from_fst(baron.parse("a = %s" % string)[0]["value"], parent=parent, on_attribute=on_attribute)
 
+        elif on_attribute == "annotation":
+            if not string.strip():
+                self.annotation_first_formatting = []
+                self.annotation_second_formatting = []
+                return ""
+
+            else:
+                if not self.annotation_first_formatting:
+                    self.annotation_first_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="return_annotation_first_formatting", parent=self)]
+
+                if not self.annotation_second_formatting:
+                    self.annotation_second_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="return_annotation_first_formatting", parent=self)]
+
+                return Node.from_fst(baron.parse("a: %s = a" % string)[0]["annotation"], parent=parent, on_attribute=on_attribute)
+
         else:
             raise Exception("Unhandled case")
 
@@ -289,6 +304,51 @@ class DecoratorNode(Node):
             raise Exception("Unhandled case")
 
 
+class DefNode(CodeBlockNode):
+    _other_identifiers = ["funcdef", "funcdef_"]
+    _default_test_value = "name"
+
+    def _string_to_node(self, string, parent, on_attribute):
+        if on_attribute == "return_annotation":
+            if not string.strip():
+                self.return_annotation_first_formatting = []
+                self.return_annotation_second_formatting = []
+                return ""
+
+            else:
+                fst = baron.parse("def a() -> %s: pass" % string)[0]["return_annotation"]
+
+                if not self.return_annotation_first_formatting:
+                    self.return_annotation_first_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="return_annotation_first_formatting", parent=self)]
+
+                if not self.return_annotation_second_formatting:
+                    self.return_annotation_second_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="return_annotation_second_formatting", parent=self)]
+
+                return Node.from_fst(fst, parent=parent, on_attribute=on_attribute)
+
+        return super(DefNode, self)._string_to_node(string, parent, on_attribute)
+
+    def _string_to_node_list(self, string, parent, on_attribute):
+        if on_attribute == "arguments":
+            fst = baron.parse("def a(%s): pass" % string)[0]["arguments"]
+            return NodeList.from_fst(fst, parent=parent, on_attribute=on_attribute)
+
+        elif on_attribute == "decorators":
+            return self.parse_decorators(string, parent=parent, on_attribute=on_attribute)
+
+        else:
+            return super(DefNode, self)._string_to_node_list(string, parent, on_attribute)
+
+    def __setattr__(self, key, value):
+        super(DefNode, self).__setattr__(key, value)
+
+        if key == "arguments" and not isinstance(self.arguments, CommaProxyList):
+            setattr(self, "arguments", CommaProxyList(self.arguments, on_attribute="arguments"))
+
+        elif key in ("async", "async_") and getattr(self, "async") and hasattr(self, "async_formatting") and not self.async_formatting:
+            self.async_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="return_annotation_first_formatting", parent=self)]
+
+
 class DefArgumentNode(Node):
     def _string_to_node(self, string, parent, on_attribute):
         if on_attribute == "value":
@@ -296,6 +356,15 @@ class DefArgumentNode(Node):
 
         elif on_attribute == "target":
             return Node.from_fst(baron.parse("def a(%s=b): pass" % string)[0]["arguments"][0]["target"], parent=parent, on_attribute=on_attribute) if string else ""
+
+        elif on_attribute == "annotation":
+            if not self.annotation_first_formatting:
+                self.annotation_first_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="annotation_first_formatting", parent=self)]
+
+            if not self.annotation_second_formatting:
+                self.annotation_second_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="annotation_second_formatting", parent=self)]
+
+            return Node.from_fst(baron.parse("def a(a:%s=b): pass" % string)[0]["arguments"][0]["annotation"], parent=parent, on_attribute=on_attribute) if string else ""
 
         else:
             raise Exception("Unhandled case")
@@ -314,6 +383,15 @@ class DictArgumentNode(Node):
     def _string_to_node(self, string, parent, on_attribute):
         if on_attribute == "value":
             return Node.from_fst(baron.parse("a(**%s)" % string)[0]["value"][1]["value"][0]["value"], parent=parent, on_attribute=on_attribute)
+
+        elif on_attribute == "annotation":
+            if not self.annotation_first_formatting:
+                self.annotation_first_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="annotation_first_formatting", parent=self)]
+
+            if not self.annotation_second_formatting:
+                self.annotation_second_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="annotation_second_formatting", parent=self)]
+
+            return Node.from_fst(baron.parse("def a(a:%s=b): pass" % string)[0]["arguments"][0]["annotation"], parent=parent, on_attribute=on_attribute) if string else ""
 
         else:
             raise Exception("Unhandled case")
@@ -511,7 +589,6 @@ class ExceptNode(CodeBlockNode):
             raise Exception("Unhandled case")
 
 
-
 class ExecNode(Node):
     def _string_to_node(self, string, parent, on_attribute):
         if on_attribute == "value":
@@ -565,6 +642,12 @@ class ForNode(ElseAttributeNode):
 
         return self.next
 
+    def __setattr__(self, key, value):
+        super(ForNode, self).__setattr__(key, value)
+
+        if key in ("async", "async_") and getattr(self, "async") and hasattr(self, "async_formatting") and not self.async_formatting:
+            self.async_formatting = " "
+
     def _string_to_node(self, string, parent, on_attribute):
         if on_attribute == "target":
             return Node.from_fst(baron.parse("for i in %s: pass" % string)[0]["target"], parent=parent, on_attribute=on_attribute)
@@ -595,7 +678,9 @@ class FromImportNode(Node):
         For example:
             RedBaron("from qsd import a, c, e as f").names() == ['a', 'c', 'f']
         """
-        return [x.target if x.target else x.value for x in self.targets]
+        return [x.target if getattr(x, "target", None) else x.value
+                for x in self.targets
+                if not isinstance(x, (LeftParenthesisNode, RightParenthesisNode))]
 
     def modules(self):
         """Return the list of the targets imported
@@ -611,7 +696,9 @@ class FromImportNode(Node):
         For example (notice 'e' instead of 'f'):
             RedBaron("from qsd import a, c, e as f").names() == ['qsd.a', 'qsd.c', 'qsd.f']
         """
-        return [self.value.dumps() + "." + (x.target if x.target else x.value) for x in self.targets]
+        return [self.value.dumps() + "." + (x.target if x.target else x.value)
+                for x in self.targets
+                if not isinstance(x, (LeftParenthesisNode, RightParenthesisNode))]
 
     def full_path_modules(self):
         """Return the list of the targets imported with the full module path
@@ -619,7 +706,9 @@ class FromImportNode(Node):
         For example (notice 'e' instead of 'f'):
             RedBaron("from qsd import a, c, e as f").names() == ['qsd.a', 'qsd.c', 'qsd.e']
         """
-        return [self.value.dumps() + "." + x.value for x in self.targets]
+        return [self.value.dumps() + "." + x.value
+                for x in self.targets
+                if not isinstance(x, (LeftParenthesisNode, RightParenthesisNode))]
 
     def _string_to_node_list(self, string, parent, on_attribute):
         if on_attribute == "targets":
@@ -641,31 +730,6 @@ class FromImportNode(Node):
 
         if key == "targets" and not isinstance(self.targets, CommaProxyList):
             setattr(self, "targets", CommaProxyList(self.targets, on_attribute="targets"))
-
-
-class DefNode(CodeBlockNode):
-    _other_identifiers = ["funcdef", "funcdef_"]
-    _default_test_value = "name"
-
-    def _string_to_node_list(self, string, parent, on_attribute):
-        if on_attribute == "arguments":
-            fst = baron.parse("def a(%s): pass" % string)[0]["arguments"]
-            return NodeList.from_fst(fst, parent=parent, on_attribute=on_attribute)
-
-        elif on_attribute == "decorators":
-            return self.parse_decorators(string, parent=parent, on_attribute=on_attribute)
-
-        else:
-            return super(DefNode, self)._string_to_node_list(string, parent, on_attribute)
-
-    def __setattr__(self, key, value):
-        super(DefNode, self).__setattr__(key, value)
-
-        if key == "arguments" and not isinstance(self.arguments, CommaProxyList):
-            setattr(self, "arguments", CommaProxyList(self.arguments, on_attribute="arguments"))
-
-        if key in ("async", "async_") and getattr(self, "async") and hasattr(self, "async_formatting") and not self.async_formatting:
-            self.async_formatting = " "
 
 
 class GeneratorComprehensionNode(Node):
@@ -823,6 +887,15 @@ class ListArgumentNode(Node):
         if on_attribute == "value":
             return Node.from_fst(baron.parse("lambda *%s: x" % string)[0]["arguments"][0]["value"], parent=parent, on_attribute=on_attribute)
 
+        elif on_attribute == "annotation":
+            if not self.annotation_first_formatting:
+                self.annotation_first_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="annotation_first_formatting", parent=self)]
+
+            if not self.annotation_second_formatting:
+                self.annotation_second_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="annotation_second_formatting", parent=self)]
+
+            return Node.from_fst(baron.parse("def a(a:%s=b): pass" % string)[0]["arguments"][0]["annotation"], parent=parent, on_attribute=on_attribute) if string else ""
+
         else:
             raise Exception("Unhandled case")
 
@@ -861,6 +934,10 @@ class LongNode(Node, LiteralyEvaluable):
 
 
 class NameNode(Node, LiteralyEvaluable):
+    pass
+
+
+class TypedNameNode(Node):
     pass
 
 
@@ -964,6 +1041,8 @@ class RaiseNode(Node):
 
             if string:
                 self.third_formatting = [{"type": "space", "value": " "}]
+                if not self.comma_or_from:
+                    self.comma_or_from = ","
                 return Node.from_fst(baron.parse("raise a, %s" % string)[0]["instance"], parent=parent, on_attribute=on_attribute)
 
         elif on_attribute == "traceback":
@@ -976,6 +1055,24 @@ class RaiseNode(Node):
 
         else:
             raise Exception("Unhandled case")
+
+    def __setattr__(self, key, value):
+        current = getattr(self, "comma_or_from", None)
+
+        super(RaiseNode, self).__setattr__(key, value)
+
+        if key == "comma_or_from":
+            if value == current:
+                return
+
+            if value == "from":
+                self.second_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="second_formatting", parent=self)]
+                self.third_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="third_formatting", parent=self)]
+
+            elif value == ",":
+                self.second_formatting = []
+                self.third_formatting = [Node.from_fst({"type": "space", "value": " "}, on_attribute="third_formatting", parent=self)]
+
 
 
 class RawStringNode(Node, LiteralyEvaluable):
@@ -1064,6 +1161,14 @@ class SliceNode(Node):
 class SpaceNode(Node):
     def __repr__(self):
         return repr(baron.dumps([self.fst()]))
+
+
+class StandaloneAnnotationNode(Node):
+    pass
+
+
+class StarExpressionNode(Node):
+    pass
 
 
 class StarNode(Node):
@@ -1300,3 +1405,6 @@ class WithNode(CodeBlockNode):
 
         if key == "contexts" and not isinstance(self.contexts, CommaProxyList):
             setattr(self, "contexts", CommaProxyList(self.contexts, on_attribute="contexts"))
+
+        if key in ("async", "async_") and getattr(self, "async") and hasattr(self, "async_formatting") and not self.async_formatting:
+            self.async_formatting = " "

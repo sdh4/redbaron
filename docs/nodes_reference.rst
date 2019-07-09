@@ -486,6 +486,18 @@ Async is a boolean attribute that determine if a function is async:
    `red.async`, it works as expected but won't make your code forward
    compatible.
 
+*New in 0.9*
+
+Return annotation management:
+
+.. ipython:: python
+
+    red =  RedBaron("def stuff():\n    return 42\n")
+    red
+    red[0].return_annotation = "Int"
+    red
+    red[0].return_annotation = ""
+    red
 
 
 DefArgumentNode
@@ -509,6 +521,18 @@ SetAttr
     red[0].arguments[0].value = "1 + 1"
     red
 
+*New in 0.9*
+
+Annotations:
+
+.. ipython:: python
+
+    red = RedBaron("def a(b): pass")
+    red
+    red[0].arguments[0].annotation = "Int"
+    red
+    red[0].arguments[0].annotation
+    red
 
 DelNode
 =======
@@ -551,6 +575,19 @@ SetAttr
     red = RedBaron("a(**b)")
     red
     red[0].value[1].value[0].value = "plop"
+    red
+
+*New in 0.9*
+
+Annotations:
+
+.. ipython:: python
+
+    red = RedBaron("def a(**b): pass")
+    red
+    red[0].arguments[0].annotation = "Int"
+    red
+    red[0].arguments[0].annotation
     red
 
 
@@ -794,6 +831,26 @@ attributes work as expected:
     red
     red[0].else_ = "    else:\n        badly_indented_and_trailing\n\n\n\n"
     red
+
+*New in 0.8*.
+
+Async is a boolean attribute that determine if a function is async:
+
+.. ipython:: python
+
+    red =  RedBaron("for a in b: pass")
+    red[0].async_
+    red[0].async_ = True
+    red
+    red[0].async_ = False
+    red
+
+.. WARNING::
+   As of python 3.7 `async` and `await` are now reserved keywords so don't uses
+   `red.async`, it works as expected but won't make your code forward
+   compatible.
+
+
 
 FromImportNode
 ==============
@@ -1071,6 +1128,19 @@ Works as expected:
     red[0].arguments[0].value = "plop"
     red
 
+*New in 0.9*
+
+Annotations:
+
+.. ipython:: python
+
+    red = RedBaron("def a(*b): pass")
+    red
+    red[0].arguments[0].annotation = "Int"
+    red
+    red[0].arguments[0].annotation
+    red
+
 
 ListComprehensionNode
 =====================
@@ -1197,6 +1267,24 @@ SetAttr
     red
 
 
+*New in 0.9*
+
+How to deal with the "raise from" notation: (by default a comma is inserted to
+avoid breaking backward compatibility)
+
+.. ipython:: python
+
+    red = RedBaron("raise stuff")
+    red
+    red[0].instance = "foo"
+    red
+    red[0].comma_or_from = "from"
+    red
+    red[0].comma_or_from = ","
+    red
+    red[0].instance = ""
+    red
+
 ReprNode
 ========
 
@@ -1297,6 +1385,19 @@ it except if you play with the way the file is rendered.
     RedBaron("1 + 1")[0].first_formatting[0].help()
     RedBaron("1 + 1").help()
 
+
+StarExpressionNode
+==================
+
+*New in 0.9*
+
+A node representing the result of a deconstruction in an assignment.
+
+.. ipython:: python
+
+   red = RedBaron("a, *b = c")
+   red
+   red[0].target[1].help()
 
 StringChainNode
 ===============
@@ -1572,3 +1673,21 @@ work as expected:
     red
     red[0].contexts = "b as plop, stuff()"
     red
+
+*New in 0.8*.
+
+Async is a boolean attribute that determine if a function is async:
+
+.. ipython:: python
+
+    red =  RedBaron("with a as b: pass")
+    red[0].async_
+    red[0].async_ = True
+    red
+    red[0].async_ = False
+    red
+
+.. WARNING::
+   As of python 3.7 `async` and `await` are now reserved keywords so don't uses
+   `red.async`, it works as expected but won't make your code forward
+   compatible.
